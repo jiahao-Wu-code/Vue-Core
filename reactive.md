@@ -1,10 +1,10 @@
 # Vue2 响应式原理
 
-> vue官方阐述：https://cn.vuejs.org/v2/guide/reactivity.html
+:star: 参考vue官方阐述：https://v2.cn.vuejs.org/v2/guide/reactivity.html
 
 **响应式数据的最终目标**，是当对象本身或对象属性发生变化时，将会运行一些函数，最常见的就是`render`函数。
 
-> 在具体的实现上，Vue 做了几个**核心部分**：
+在具体的实现上，Vue 做了几个**核心模块**：
 1. Observer
 2. Dep
 3. Watcher
@@ -144,6 +144,60 @@ if (Dep.target) {
 
 
 ## Watcher
->todo
+观察者（订阅者），当页面的依赖数据变化，需要去通知用到该数据的地方更新,通过`dep.notify()`派发更新，`watcher`就是用来做这个数据的订阅者。数据变化不会立即执行函数，而是将函数交给`watcher`，通过`dep.depend()`记录依赖，`Dep`上就会有记录，表示有一个`watcher`用到了这个数据。`watcher`内部需要自己实例化一个`dep`，当访问数据时把`watcher`添加到`dep`的`subs`中，调用 `update函数` 更新数据。
+```js
+class Watcher {
+  constructor (vm, key, cb) {
+    this.vm = vm
+
+    // data 中的属性名称
+    this.key = key
+    // 当数据变化的时候，调用 cb 更新视图
+    this.cb = cb
+    // 在 Dep 的静态属性上记录当前 watcher 对象，当访问数据的时候把 watcher 添加到dep 的 subs 中
+    Dep.target = this
+    // 触发一次 getter，让 dep 为当前 key 记录 watcher
+    this.oldValue = vm[key]
+    // 清空 target
+    Dep.target = null
+  }
+  update () {
+    const newValue = this.vm[this.key]
+    if (this.oldValue === newValue) {
+      return
+    }
+    this.cb(newValue)
+  }
+}
+```
+
 ## Scheduler
->todo
+
+:rainbow: 调度器。当`dep`通知`watcher`去运行相应的函数时，有可能导致这个函数多次运行，换句话说就是同一个`watcher`添加了多次。为了解决这个问题，Vue做了一个`Scheduler`来处理这个问题。
+```js
+const MAX_UPDATE_COUNT = 100
+// 定义每一个Watcher数组（队列）
+const queue: Array<Watcher> = []
+
+function queueWatcher(watcher: Watcher) {
+  // 将 watcher添加到队列中，有相同id的watcher跳过
+  const id = watcher.id
+  if (has[id] != null) {
+    return
+  }
+
+  if (watcher === Dep.target && watcher.noRecurse) {
+    return
+  }
+  // 其他处理逻辑...
+  queue.push(watcher)
+  // 内部通过nextTick方法加到为队列
+  nextTick(flushSchedulerQueue)
+}
+```
+
+:star: 综上所述，`Scheduler` 内部维护一个`Watcher`的队列，该队列中的同一个`watcher`只会出现一次，并且`Watcher`队列不是立即去执行，而是通过`nextTick`方法将这些`watcher`放到微队列中依次执行。
+
+## 总结
+
+:rainbow:数据响应式首先是将数据通过`Object.defineProperty`把数据添加`getter`和`setter`，再通过`Dep`运行`getter`去收集依赖，运行`setter`去派发更新，`Watcher`接到通知，不立即执行函数，而是交给一个`Schedule`调度器去运行函数，做到数据、页面的更新。:star:
