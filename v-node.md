@@ -1,40 +1,34 @@
 # 浅析 v-node 
+:rainbow: 本节我们来探索一下虚拟DOM，将会从以下4个方面进行阐述：
 
-## 什么是虚拟DOM
+1. 虚拟DOM的本质
+2. 虚拟DOM的优势
+3. 虚拟DOM转换真实DOM 过程
+4. 虚拟DOM树 diff算法
 
-
->虚拟DOM 本质上是一个 **js 对象**，用于描述页面的结构，在 Vue 中，每个组件都有一个**render函数**，每一个 render 函数会返回一棵**虚拟DOM树**。
-
-虚拟DOM 的部分属性：
-``` 
-  tag: string | void;
-  data: VNodeData | void;
-  children: ?Array<VNode>;
-  text: string | void;
-  elm: Node | void;
-  ns: string | void;
-  context: Component | void; // rendered in this component's scope
-  key: string | number | void;
-  componentOptions: VNodeComponentOptions | void;
-  componentInstance: Component | void; // component instance
-  parent: VNode | void; // component placeholder node
-```
-## 为什么需要虚拟DOM
-
-> 1.当页面上的 **依赖数据** 变化时，组件重新渲染，重新运行**render函数**，得到一棵新的虚拟DOM树，将新旧两棵树进行对比，通过 **patch** 算法，做到最小量更新。
->
-> 2.如果去操作真实的DOM，整个的DOM结构都得去创建，对真实DOM的创建、更新、插入是非常消耗性能的，降低渲染效率，用虚拟DOM代替真实DOM，解决了渲染效率的问题。
+## 虚拟DOM的本质
 
 
-## 虚拟DOM是如何转换为真实DOM
->在一个组件实例首次被渲染时，它先生成虚拟DOM树，然后根据虚拟DOM树创建真实DOM，并把真实DOM挂载到页面中合适的位置，此时，每个虚拟DOM便会对应一个真实的DOM。
->如果一个组件受响应式数据变化的影响，需要重新渲染时，它仍然会重新调用render函数，创建出一个新的虚拟DOM树，用新树和旧树对比，通过对比，vue会找到最小更新量，然后更新必要的虚拟DOM节点，最后，这些更新过的虚拟节点，会去修改它们对应的真实DOM,这样一来，就保证了对真实DOM达到最小的改动。
+:star:虚拟DOM 本质上是一个 **js 对象**，用于描述页面的结构，在 Vue 中，每个组件都有一个**render函数**，每一个 `render` 函数运行会返回一棵**虚拟DOM树**。
+
+打印一下虚拟DOM:point_down:
+![v-node](https://github.com/jiahao-Wu-code/Imags/blob/main/imgs/20220902094823.png?raw=true)
+
+## 虚拟DOM的优势
+
+1. 当组件的 **依赖数据** 变化时，该组件需要重新渲染，去重新运行**render函数**，得到一棵新的虚拟DOM树，将新旧两棵树进行对比，通过 **patch** 算法，做到最小量更新。
+2. 如果每次渲染去对真实DOM的创建、更新、插入是非常消耗性能的，降低渲染效率，用虚拟DOM代替真实DOM，解决了渲染效率的问题。
+
+
+## 虚拟DOM转换真实DOM 过程
+1. 当组件首次渲染时，它会先生成虚拟DOM树，然后根据虚拟DOM树创建真实DOM，并把真实DOM挂载到页面中合适的位置，此时，每个虚拟DOM便会对应一个真实的DOM。(首次渲染，虚拟DOM优势不是很大，比操作真实DOM多了一个构建虚拟DOM树的过程，在后续更新过程中，优势变得更大。)
+2. 如果组件不是首次渲染，依赖数据发生变化，则需要重新渲染，重新调用render函数，创建出一个新的虚拟DOM树，用新树和旧树对比，通过内部`patch`函数，vue会找到最小更新量，然后更新必要的虚拟DOM节点，最后，这些更新过的虚拟节点，会去修改它们对应的真实DOM,做一些属性上的更新，保证了树的稳定和最小量更新。
 
 ## 虚拟DOM树 diff 算法
 
-1. `diff`的时机
+1. `diff`发生的时机
 
-   当组件创建时，以及依赖的属性或数据变化时，会运行一个函数，该函数会做两件事：
+   是在组件实例创建时，以及依赖的属性或数据变化时，会运行一个函数，该函数会做两件事：
 
    - 运行`_render`生成一棵新的虚拟dom树（vnode tree）
    - 运行`_update`，传入虚拟dom树的根节点，对新旧两棵树进行对比，最终完成对真实dom的更新
@@ -73,9 +67,7 @@
   
 3. `patch`函数的对比流程
 
-   **术语解释**：
-
-   1. **相同**：是指两个虚拟节点的标签类型、`key`值均相同，但`input`元素还要看`type`属性
+   1. **相同**：是指两个虚拟节点的标签类型、`key`值均相同，但`input`元素还要看`type`属性，具体实现如下:point_down:：
     ```js
     function sameVnode (a, b) {
         return (
@@ -101,7 +93,7 @@
         return typeA === typeB || isTextInputType(typeA) && isTextInputType(typeB)
     } 
     ```
-   2. **新建元素**：是指根据一个虚拟节点提供的信息，创建一个真实dom元素，同时挂载到虚拟节点的`elm`属性上
+   2. **新建元素**：根据一个虚拟节点提供的信息，创建一个真实dom元素，并且挂载到该虚拟节点的`elm`属性上
    ``` js
       fucntion create(){
         // 其他代码... 
@@ -111,9 +103,9 @@
         : nodeOps.createElement(tag, vnode)
       }
    ```
-   3. **销毁元素**：是指：`vnode.elm.remove()`
-   4. **更新**：是指对两个虚拟节点进行对比更新，它**仅发生**在两个虚拟节点**相同**的情况下，做一些属性的更新
-   5. **对比子节点**：是指对两个虚拟节点的子节点进行对比
+   1. **销毁元素**：通过`vnode.elm.remove()`方法进行销毁
+   2. **更新**：两个虚拟节点进行对比更新，它**仅发生**在两个虚拟节点**相同**的情况下，做一些属性的更新
+   3. **对比子节点**：两个虚拟节点的子节点进行对比
    ```js
    function updateChildren (parentElm, oldCh, newCh, insertedVnodeQueue, removeOnly) {
     // 为新旧两棵树分别创建首位两个指针，遍历的同时做 删除和新建操作
@@ -126,7 +118,7 @@
     }
    ```
 
-    **对比流程：**
+    **diff过程：**
     1. **根节点对比**
       `patch`函数先对根节点进行对比
       如果两个节点
@@ -139,10 +131,5 @@
         2. 旧节点**销毁元素**
     2.  **对比子节点**
 
-        在**对比子节点**时，vue一切的出发点，都是为了最小量更新：
-
-      - 尽量啥也别做
-      - 不行的话，尽量仅改动元素属性
-      - 还不行的话，尽量移动元素，而不是删除和创建元素
-      - 还不行的话，删除和创建元素
+      在**对比子节点**时，vue一切的出发点，都是为了最小量更新，尽量做到只是元素的移动，属性的更新，实在不行只能新建和删除元素。
 
